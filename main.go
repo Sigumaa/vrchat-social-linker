@@ -31,79 +31,6 @@ type User struct {
 	RequiresTwoFactorAuth []string `json:"requiresTwoFactorAuth"`
 }
 
-func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	username := os.Getenv("VRCHAT_USERNAME")
-	password := os.Getenv("VRCHAT_PASSWORD")
-
-	if username == "" || password == "" {
-		log.Fatal("環境変数 VRCHAT_USERNAME または VRCHAT_PASSWORD が設定されていません")
-	}
-
-	cookieFile := "cookies.json"
-
-	jar, err := persistentcookiejar.New(&persistentcookiejar.Options{
-		Filename:         cookieFile,
-		PublicSuffixList: publicsuffix.List,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	client := &http.Client{
-		Jar: jar,
-	}
-
-	if user, err := getCurrentUser(client); err == nil {
-		fmt.Printf("既存のセッションを使用します。ログインユーザー: %s\n", user.DisplayName)
-	} else {
-		if err := performLogin(client, username, password, jar); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	cache, err := loadCache("cache.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	friends, err := getAllFriends(client)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	twitterLinks := filterTwitterLinks(friends)
-	friendCount := len(friends)
-	twitterLinkCount := len(twitterLinks)
-
-	if friendCount == 0 || twitterLinkCount == 0 {
-		fmt.Println("フレンドが見つかりませんでした。")
-		return
-	}
-
-	fmt.Printf("フレンド人数 %d 人のうち %d 人がリンクを登録していました。\n", friendCount, twitterLinkCount)
-
-	newLinks := filterNewLinks(twitterLinks, cache)
-
-	if len(newLinks) == 0 {
-		fmt.Println("リンクを更新したフレンドはいませんでした。")
-		return
-	}
-
-	displayTwitterLinks(newLinks)
-	confirmAndOpenLinks(newLinks)
-
-	for displayName, link := range newLinks {
-		cache[displayName] = link
-	}
-	if err := saveCache("cache.json", cache); err != nil {
-		log.Fatal(err)
-	}
-}
-
 func login(client *http.Client, username, password string) (*User, error) {
 	req, err := http.NewRequest("GET", "https://api.vrchat.cloud/api/1/auth/user", nil)
 	if err != nil {
@@ -190,6 +117,19 @@ func handleTwoFactorAuth(client *http.Client, methods []string) error {
 		}
 
 		fmt.Printf("%s認証成功\n", codeType)
+	}
+	return nil
+}
+
+func performLogin(client *http.Client, username, password string, jar *persistentcookiejar.Jar) error {
+	user, err := login(client, username, password)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("ログイン成功: %s\n", user.DisplayName)
+
+	if err := jar.Save(); err != nil {
+		return fmt.Errorf("クッキーの保存に失敗しました: %v", err)
 	}
 	return nil
 }
@@ -356,15 +296,75 @@ func getCurrentUser(client *http.Client) (*User, error) {
 	return &currentUser, nil
 }
 
-func performLogin(client *http.Client, username, password string, jar *persistentcookiejar.Jar) error {
-	user, err := login(client, username, password)
-	if err != nil {
-		return err
+func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
 	}
-	fmt.Printf("ログイン成功: %s\n", user.DisplayName)
 
-	if err := jar.Save(); err != nil {
-		return fmt.Errorf("クッキーの保存に失敗しました: %v", err)
+	username := os.Getenv("VRCHAT_USERNAME")
+	password := os.Getenv("VRCHAT_PASSWORD")
+
+	if username == "" || password == "" {
+		log.Fatal("環境変数 VRCHAT_USERNAME または VRCHAT_PASSWORD が設定されていません")
 	}
-	return nil
+
+	cookieFile := "cookies.json"
+
+	jar, err := persistentcookiejar.New(&persistentcookiejar.Options{
+		Filename:         cookieFile,
+		PublicSuffixList: publicsuffix.List,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client := &http.Client{
+		Jar: jar,
+	}
+
+	if user, err := getCurrentUser(client); err == nil {
+		fmt.Printf("既存のセッションを使用します。ログインユーザー: %s\n", user.DisplayName)
+	} else {
+		if err := performLogin(client, username, password, jar); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	cache, err := loadCache("cache.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	friends, err := getAllFriends(client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	twitterLinks := filterTwitterLinks(friends)
+	friendCount := len(friends)
+	twitterLinkCount := len(twitterLinks)
+
+	if friendCount == 0 || twitterLinkCount == 0 {
+		fmt.Println("フレンドが見つかりませんでした。")
+		return
+	}
+
+	fmt.Printf("フレンド人数 %d 人のうち %d 人がリンクを登録していました。\n", friendCount, twitterLinkCount)
+
+	newLinks := filterNewLinks(twitterLinks, cache)
+
+	if len(newLinks) == 0 {
+		fmt.Println("リンクを更新したフレンドはいませんでした。")
+		return
+	}
+
+	displayTwitterLinks(newLinks)
+	confirmAndOpenLinks(newLinks)
+
+	for displayName, link := range newLinks {
+		cache[displayName] = link
+	}
+	if err := saveCache("cache.json", cache); err != nil {
+		log.Fatal(err)
+	}
 }
