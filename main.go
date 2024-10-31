@@ -193,7 +193,7 @@ func filterTwitterLinks(friends []Friend) map[string]string {
 }
 
 func displayTwitterLinks(twitterLinks map[string]string) {
-	fmt.Println("以下のTwitterリンクが見つかりました:")
+	fmt.Println("以下の新規Twitterリンクが見つかりました:")
 	fmt.Println()
 	for displayName, link := range twitterLinks {
 		fmt.Printf("%s: %s\n", displayName, link)
@@ -203,7 +203,7 @@ func displayTwitterLinks(twitterLinks map[string]string) {
 
 func confirmAndOpenLinks(twitterLinks map[string]string) {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("これらのリンクをすべて開きますか？ [y/n]: ")
+	fmt.Print("これらのリンクをブラウザで開きますか？ [y/n]: ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 
@@ -349,7 +349,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("フレンド人数 %d 人のうち %d 人がリンクを登録していました。\n", friendCount, twitterLinkCount)
+	fmt.Printf("フレンド人数%d人中%d人がリンクを登録していました。\n", friendCount, twitterLinkCount)
 
 	newLinks := filterNewLinks(twitterLinks, cache)
 
